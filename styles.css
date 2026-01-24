@@ -1,8 +1,346 @@
-/*
+/* AnkiBlocks Card Preview Styles */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.anki-card-container {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	margin: 1em 0;
+	overflow: hidden;
+	background: var(--background-primary);
+}
 
-If your plugin does not need CSS, delete this file.
+/* Header */
+.anki-card-header {
+	background: var(--background-secondary);
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	cursor: pointer;
+}
 
-*/
+.anki-card-title-row {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+
+.anki-card-container.collapsed .anki-card-title-row {
+	margin-bottom: 0;
+}
+
+/* Collapsed text - flows inline naturally */
+.anki-card-collapsed-text {
+	flex: 1;
+	color: var(--text-normal);
+	display: none;
+}
+
+.anki-card-container.collapsed .anki-card-collapsed-text {
+	display: inline;
+}
+
+/* Card collapse toggle - chevron on the right */
+.anki-card-collapse-toggle {
+	flex-shrink: 0;
+	color: var(--text-muted);
+	transition: transform 0.2s ease;
+}
+
+.anki-card-collapse-toggle::before {
+	content: '›';
+	font-size: 1.2em;
+	font-weight: bold;
+}
+
+/* Rotate arrow down when expanded */
+.anki-card-container:not(.collapsed) .anki-card-collapse-toggle {
+	transform: rotate(90deg);
+}
+
+/* Hide content when collapsed */
+.anki-card-container.collapsed .anki-card-fields,
+.anki-card-container.collapsed .anki-card-tags,
+.anki-card-container.collapsed .anki-card-footer,
+.anki-card-container.collapsed .anki-card-meta-row {
+	display: none;
+}
+
+/* Hide collapsed text when expanded */
+.anki-card-container:not(.collapsed) .anki-card-collapsed-text {
+	display: none;
+}
+
+/* Expanded text - visible when expanded, hidden when collapsed */
+.anki-card-expanded-text {
+	flex: 1;
+	color: var(--text-normal);
+}
+
+.anki-card-container.collapsed .anki-card-expanded-text {
+	display: none;
+}
+
+.anki-card-icon {
+	font-weight: 600;
+	color: var(--text-accent);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.anki-card-model {
+	color: var(--text-accent);
+	opacity: 0.8;
+}
+
+.anki-card-meta-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-size: 0.85em;
+}
+
+.anki-card-deck {
+	color: var(--text-normal);
+	font-weight: 500;
+}
+
+.anki-card-sync-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	font-size: 0.75em;
+	font-weight: 500;
+}
+
+.anki-card-sync-badge.synced {
+	background: var(--background-modifier-success);
+	color: var(--text-on-accent);
+}
+
+.anki-card-sync-badge.not-synced {
+	background: var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.anki-card-sync-badge.modified {
+	background: #f56c6c;
+	color: #fff;
+}
+
+.anki-card-sync-badge.ignored {
+	background: var(--background-modifier-border);
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+/* Fields */
+.anki-card-fields {
+	padding: 0;
+}
+
+.anki-card-field {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.anki-card-field:last-child {
+	border-bottom: none;
+}
+
+.anki-card-field-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 16px;
+	cursor: pointer;
+	background: var(--background-primary-alt);
+	user-select: none;
+}
+
+.anki-card-field-header:hover {
+	background: var(--background-secondary);
+}
+
+.anki-card-collapse-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform 0.2s ease;
+	color: var(--text-muted);
+}
+
+.anki-card-field.collapsed .anki-card-collapse-icon {
+	transform: rotate(-90deg);
+}
+
+.anki-card-field-label {
+	font-weight: 600;
+	font-size: 0.9em;
+	color: var(--text-normal);
+}
+
+.anki-card-field-content {
+	padding: 12px 16px;
+	overflow: hidden;
+	transition: max-height 0.2s ease, padding 0.2s ease;
+}
+
+.anki-card-field.collapsed .anki-card-field-content {
+	max-height: 0;
+	padding-top: 0;
+	padding-bottom: 0;
+}
+
+.anki-card-field-content p:first-child {
+	margin-top: 0;
+}
+
+.anki-card-field-content p:last-child {
+	margin-bottom: 0;
+}
+
+/* Tags */
+.anki-card-tags {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 16px;
+	background: var(--background-secondary);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.anki-card-tags-label {
+	color: var(--text-muted);
+	font-size: 0.8em;
+}
+
+.anki-card-tags-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.anki-card-tag {
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
+	padding: 2px 8px;
+	border-radius: 4px;
+	font-size: 0.75em;
+}
+
+/* Footer */
+.anki-card-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 16px;
+	background: var(--background-secondary);
+	border-top: 1px solid var(--background-modifier-border);
+	font-size: 0.75em;
+	color: var(--text-muted);
+}
+
+.anki-card-note-id {
+	font-family: var(--font-monospace);
+}
+
+/* Error state */
+.anki-card-container.anki-card-error {
+	border-color: var(--background-modifier-error);
+}
+
+.anki-card-container.anki-card-error .anki-card-header {
+	background: var(--background-modifier-error);
+}
+
+.anki-card-container.anki-card-error .anki-card-icon {
+	color: var(--text-on-accent);
+}
+
+.anki-error-message {
+	color: var(--text-error);
+	padding: 16px;
+	margin: 0;
+}
+
+/* Modal styles */
+.anki-modal-content {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.anki-modal-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.anki-modal-field label {
+	font-weight: 500;
+	font-size: 0.9em;
+}
+
+.anki-modal-field input,
+.anki-modal-field select,
+.anki-modal-field textarea {
+	width: 100%;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+}
+
+.anki-modal-field textarea {
+	min-height: 100px;
+	resize: vertical;
+	font-family: inherit;
+}
+
+.anki-modal-buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+/* Delete button */
+.anki-card-delete-btn {
+	background: transparent;
+	border: 1px solid var(--background-modifier-error);
+	color: var(--text-error);
+	padding: 2px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.75em;
+}
+
+.anki-card-delete-btn:hover {
+	background: var(--background-modifier-error);
+	color: var(--text-on-accent);
+}
+
+/* Sync error modal */
+.anki-error-intro {
+	color: var(--text-muted);
+	margin-bottom: 12px;
+}
+
+.anki-error-list {
+	background: var(--background-primary-alt);
+	border-radius: 4px;
+	padding: 12px 12px 12px 32px;
+	margin: 0 0 16px 0;
+	max-height: 300px;
+	overflow-y: auto;
+}
+
+.anki-error-list li {
+	color: var(--text-error);
+	margin-bottom: 8px;
+}
+
+.anki-error-list li:last-child {
+	margin-bottom: 0;
+}

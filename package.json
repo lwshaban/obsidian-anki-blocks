@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "anki-blocks",
+	"version": "0.1.0",
+	"description": "Obsidian plugin for syncing flashcards to Anki",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
@@ -13,6 +13,7 @@
 	"keywords": [],
 	"license": "0-BSD",
 	"devDependencies": {
+		"@types/js-yaml": "^4.0.9",
 		"@types/node": "^16.11.6",
 		"esbuild": "0.25.5",
 		"eslint-plugin-obsidianmd": "0.1.9",
@@ -24,6 +25,7 @@
 		"jiti": "2.6.1"
 	},
 	"dependencies": {
-		"obsidian": "latest"
+		"obsidian": "latest",
+		"js-yaml": "^4.1.0"
 	}
 }
