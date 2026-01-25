@@ -11,6 +11,7 @@ export interface AnkiBlocksSettings {
 	defaultModel: string;
 	collapsedDisplayFormat: string;
 	expandedDisplayFormat: string;
+	convertMarkdownToHtml: boolean;
 }
 
 /**
@@ -22,6 +23,7 @@ export const DEFAULT_SETTINGS: AnkiBlocksSettings = {
 	defaultModel: 'Basic',
 	collapsedDisplayFormat: '{card-type}: {title}',
 	expandedDisplayFormat: '{card-type}',
+	convertMarkdownToHtml: true,
 };
 
 /**
@@ -128,6 +130,19 @@ export class AnkiBlocksSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.expandedDisplayFormat)
 				.onChange(async (value) => {
 					this.plugin.settings.expandedDisplayFormat = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// Conversion section
+		new Setting(containerEl).setName('Content Conversion').setHeading();
+
+		new Setting(containerEl)
+			.setName('Convert Markdown to HTML')
+			.setDesc('Automatically convert Markdown formatting to HTML when syncing to Anki. Anki uses HTML for card content.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.convertMarkdownToHtml)
+				.onChange(async (value) => {
+					this.plugin.settings.convertMarkdownToHtml = value;
 					await this.plugin.saveSettings();
 				}));
 

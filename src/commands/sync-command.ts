@@ -6,6 +6,7 @@ import { ANKI_BLOCK_REGEX } from '../utils/constants';
 import { AnkiBlockMatch, SyncResult, GlobalSyncResult, AnkiCard } from '../types';
 import { computeContentHash } from '../utils/hash';
 import { SyncErrorModal } from '../ui/sync-error-modal';
+import { convertFieldsToHtml } from '../utils/html-markdown-converter';
 
 /**
  * Build an Obsidian URI for the given file.
@@ -18,22 +19,29 @@ function buildObsidianUri(plugin: AnkiBlocksPlugin, file: TFile): string {
 }
 
 /**
- * Get fields with source link appended if linkSource is enabled.
+ * Get fields ready for sync to Anki.
+ * Converts Markdown to HTML if enabled, and appends source link if linkSource is enabled.
  */
 function getFieldsForSync(card: AnkiCard, plugin: AnkiBlocksPlugin, file: TFile): Record<string, string> {
-	if (!card.linkSource) {
-		return card.fields;
+	// Start with the original fields
+	let fields = { ...card.fields };
+
+	// Convert Markdown to HTML if enabled
+	if (plugin.settings.convertMarkdownToHtml) {
+		fields = convertFieldsToHtml(fields);
 	}
 
-	const fields = { ...card.fields };
-	const fieldNames = Object.keys(fields);
-	const lastFieldName = fieldNames[fieldNames.length - 1];
+	// Append source link if enabled
+	if (card.linkSource) {
+		const fieldNames = Object.keys(fields);
+		const lastFieldName = fieldNames[fieldNames.length - 1];
 
-	if (lastFieldName) {
-		const uri = buildObsidianUri(plugin, file);
-		const fileName = file.basename;
-		const link = `<br><br><a href="${uri}">${fileName}</a>`;
-		fields[lastFieldName] = fields[lastFieldName] + link;
+		if (lastFieldName) {
+			const uri = buildObsidianUri(plugin, file);
+			const fileName = file.basename;
+			const link = `<br><br><a href="${uri}">${fileName}</a>`;
+			fields[lastFieldName] = fields[lastFieldName] + link;
+		}
 	}
 
 	return fields;

@@ -95,6 +95,9 @@ export class AnkiConnectService {
 	 * @param fieldsOverride - Optional fields to use instead of card.fields (for adding source links)
 	 */
 	async addNote(card: AnkiCard, fieldsOverride?: Record<string, string>): Promise<number> {
+		// Always ensure deck exists (createDeck is idempotent)
+		await this.createDeck(card.deck);
+
 		const noteId = await this.request<number | null>('addNote', {
 			note: {
 				deckName: card.deck,
@@ -177,13 +180,14 @@ export class AnkiConnectService {
 
 	/**
 	 * Change the deck of a note's cards.
-	 * Creates the deck if it doesn't exist.
+	 * Note: In Anki, changing decks requires deleting and re-adding the card.
+	 * This method only works if the target deck already exists.
 	 */
 	async changeNoteDeck(noteId: number, deckName: string): Promise<void> {
-		// Ensure deck exists
+		// Check if deck exists first - changing to a non-existent deck requires delete + re-add
 		const exists = await this.deckExists(deckName);
 		if (!exists) {
-			await this.createDeck(deckName);
+			throw new Error(`Deck "${deckName}" does not exist. To move a card to a new deck, delete it and re-add it.`);
 		}
 
 		// Get card IDs for this note
