@@ -134,7 +134,7 @@ export class AnkiBlocksSettingTab extends PluginSettingTab {
 				}));
 
 		// Conversion section
-		new Setting(containerEl).setName('Content Conversion').setHeading();
+		new Setting(containerEl).setName('Content conversion').setHeading();
 
 		new Setting(containerEl)
 			.setName('Convert Markdown to HTML')

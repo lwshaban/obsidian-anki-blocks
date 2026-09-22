@@ -1,9 +1,9 @@
 {
 	"id": "anki-blocks",
 	"name": "AnkiBlocks",
-	"version": "0.2.0",
-	"minAppVersion": "1.0.0",
-	"description": "Sync flashcards to Anki using YAML in code blocks",
+	"version": "0.3.0",
+	"minAppVersion": "1.6.0",
+	"description": "Write Anki flashcards in Markdown notes and sync them to Anki.",
 	"author": "Lawrence Shaban",
 	"isDesktopOnly": false
 }

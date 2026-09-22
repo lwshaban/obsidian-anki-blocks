@@ -1,7 +1,7 @@
 import { App, Editor, Modal, Setting } from 'obsidian';
 import type AnkiBlocksPlugin from '../main';
-import { generateCardYaml } from '../services/parser';
-import { getModelFields } from '../utils/constants';
+import { serializeCard } from '../services/card-format';
+import { getModelFields, wrapInFence } from '../utils/constants';
 
 /**
  * Modal for creating a new Anki card.
@@ -141,8 +141,7 @@ export class CardCreationModal extends Modal {
 			.map(t => t.trim())
 			.filter(t => t !== '');
 
-		// Generate YAML
-		const yaml = generateCardYaml({
+		const body = serializeCard({
 			deck: this.deck.trim(),
 			model: this.model.trim(),
 			fields: this.fields,
@@ -150,11 +149,7 @@ export class CardCreationModal extends Modal {
 			noteId: null,
 		});
 
-		// Wrap in 5-backtick fence
-		const codeBlock = `\`\`\`\`\`anki\n${yaml}\n\`\`\`\`\``;
-
-		// Insert at cursor position
-		this.editor.replaceSelection(codeBlock + '\n');
+		this.editor.replaceSelection(wrapInFence(body) + '\n');
 
 		this.close();
 	}

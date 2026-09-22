@@ -1,4 +1,4 @@
-import { Plugin } from 'obsidian';
+import { Platform, Plugin } from 'obsidian';
 import { AnkiBlocksSettings, AnkiBlocksSettingTab, DEFAULT_SETTINGS } from './settings';
 import { registerCommands } from './commands';
 import { registerAnkiBlockProcessor } from './ui/card-renderer';
@@ -19,10 +19,12 @@ export default class AnkiBlocksPlugin extends Plugin {
 		// Add settings tab
 		this.addSettingTab(new AnkiBlocksSettingTab(this.app, this));
 
-		// Add ribbon icon for quick sync
-		this.addRibbonIcon('layers', 'Sync Anki cards', () => {
-			void syncCurrentFile(this);
-		});
+		// Add ribbon icon for quick sync (desktop only)
+		if (!Platform.isMobile) {
+			this.addRibbonIcon('layers', 'Sync Anki cards', () => {
+				void syncCurrentFile(this);
+			});
+		}
 	}
 
 	async loadSettings(): Promise<void> {

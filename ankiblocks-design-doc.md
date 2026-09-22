@@ -2,7 +2,7 @@
 
 ## Overview
 
-AnkiBlocks is an Obsidian plugin for two-way sync between Obsidian and Anki, with a primary focus on Obsidian → Anki synchronization. It differentiates itself from existing plugins through its YAML-based syntax that handles multiline content naturally, and clean visual rendering.
+AnkiBlocks is an Obsidian plugin for two-way sync between Obsidian and Anki, with a primary focus on Obsidian → Anki synchronization. It differentiates itself from existing plugins through a card syntax that holds Markdown verbatim — no indentation, no escaping, no nesting limits — and clean visual rendering.
 
 ## Project Goals
 
@@ -14,211 +14,64 @@ AnkiBlocks is an Obsidian plugin for two-way sync between Obsidian and Anki, wit
 
 ## Design Philosophy
 
-### Why YAML?
+### Why not YAML or JSON
 
-The plugin uses YAML as its core syntax for several key reasons:
+The first implementation used YAML with block scalars, falling back to JSON. Both were abandoned. The lesson was that a *data* format is the wrong tool for holding *prose*:
 
-1. **Natural Multiline Support** - YAML's block scalar syntax (`|`) handles multiline content without escaping
-2. **Human-Readable** - Clean, indentation-based structure that's easy to read and write
-3. **No Escape Characters** - Code blocks, paragraphs, and formatted text work naturally without `\n` escaping
-4. **Direct API Compatibility** - YAML can be parsed and converted to JSON for AnkiConnect's API
-5. **Flexible Structure** - Clear key-value pairs with explicit nesting via indentation
-6. **Copy-Paste Friendly** - Content can be pasted directly without modification
-7. **Programmatic Generation** - Still easy to generate cards via scripts (YAML parsers handle JSON too)
+1. **Indentation tax** — every content line needed four leading spaces. Pasting a code snippet meant re-indenting it, and getting it wrong produced a parse error instead of a card.
+2. **Type coercion** — YAML infers types on values that aren't typed. A deck named `1.0` failed validation as "not a string"; an 8-character hex hash like `12e45678` parsed as scientific notation and became `Infinity`, so that card re-synced forever. The old parser carried a `String(lastSyncedHash)` workaround as evidence.
+3. **Unsafe write-back** — serialising arbitrary strings to YAML correctly needs a real emitter. The plugin concatenated strings, so a deck named `Physics: Optics` or a tag containing a comma produced an invalid block *as a result of syncing a valid one*.
+4. **Lossy round-trips** — regenerating the block from a fixed key list silently discarded comments, key order, and any key the plugin didn't know about.
+5. **Fence fragility** — the 5-backtick workaround broke if content contained five backticks, and 3-backtick `anki` blocks rendered in preview but were invisible to the sync regex.
 
-### The Code Block Nesting Problem
+### The box format
 
-Initial consideration was given to both callout syntax and standard triple-backtick code blocks, but both have limitations:
+A flat header, then `[Field]` boxes holding literal Markdown:
 
-**Callout Syntax (`> [!anki]`):**
-- Doesn't nest well with complex card structures
-- Difficult to distinguish front/back fields
-- Doesn't naturally support cloze deletions
-
-**Triple Backtick Code Blocks (` ```anki `):**
-- **Critical Issue**: Cannot contain nested code blocks
-- When content contains ` ```python ` inside a field, the markdown parser treats the first ` ``` ` as the closing fence
-- This breaks the entire code block
-
-**Solution: 5-Backtick Code Blocks with YAML**
-
-Following the CommonMark specification, Obsidian supports variable-length code fences:
-
-- Opening fence with 5 backticks: `` `````anki ``
-- Inner content can contain up to 4 backticks without breaking
-- Closing fence with 5 backticks: `` ````` ``
-
-This allows nested code blocks within YAML field content while maintaining proper parsing. YAML's block scalar syntax (`|`) makes multiline content explicit and unambiguous.
-
-## Card Syntax
-
-### Basic Card Structure (YAML - Primary Format)
-
-``````markdown
-`````anki
-deck: Programming
+~~~
+~~~anki
+deck: Programming::Algorithms
 model: Basic
-fields:
-  Front: |
-    What's the time complexity of binary search?
-  Back: |
-    O(log n)
-tags: [algorithms, python]
-noteId: null
-`````
-``````
+tags: algorithms, python
 
-### Card with Nested Code Block
+[Front]
+What's the time complexity of binary search?
 
-``````markdown
-`````anki
-deck: Programming
-model: Basic
-fields:
-  Front: |
-    What does this function do?
-    
-    ```python
-    def binary_search(arr, x):
-        left, right = 0, len(arr) - 1
-        while left <= right:
-            mid = (left + right) // 2
-            if arr[mid] == x:
-                return mid
-            elif arr[mid] < x:
-                left = mid + 1
-            else:
-                right = mid - 1
-        return -1
-    ```
-    
-    Explain the algorithm and its time complexity.
-  Back: |
-    Implements binary search algorithm.
-    
-    Time complexity: O(log n)
-    Space complexity: O(1)
-    
-    Key points:
-    - Divides search space in half each iteration
-    - Requires sorted array
-    - Returns index if found, -1 otherwise
-tags: [python, algorithms, search]
-noteId: 1234567890
-`````
-``````
-
-### YAML Schema
-
-```yaml
-deck: string (required) - Name of Anki deck
-model: string (required) - Anki note type (e.g., 'Basic', 'Cloze')
-fields:
-  FieldName: |
-    Field content with markdown/HTML
-    Use the pipe (|) character for multiline content
-tags: [array, of, strings] (optional)
-noteId: number or null - Anki note ID (null for new cards)
+```python
+def binary_search(arr, x): ...
 ```
 
-### Understanding YAML Block Scalars
+[Back]
+**O(log n)**
 
-The `|` (pipe) character after a field name indicates a **block scalar** - everything indented below it is literal text content:
+[sync] id=1748291045821 rev=a3f9c1
+~~~
+~~~
 
-``````markdown
-`````anki
-fields:
-  Front: |
-    This is all content
-    Even things that look like YAML:
-    key: value
-    - list item
-    These are just text!
-  Back: |
-    Another field starts here
-`````
-``````
+**Rules**
 
-**Important Rules:**
-- Always use `|` after field names for multiline content
-- Content must be indented (typically 2 or 4 spaces)
-- Everything at that indent level is literal text, not YAML structure
-- This prevents ambiguity - colons, dashes, and other YAML syntax in your content won't be misinterpreted
+- **Header** — lines before the first box. `key: value`, where the value is the rest of the line, verbatim and always a string. No nesting, so no indentation rules and no type inference.
+- **Boxes** — a line that is exactly `[Name]` opens a field. Body is at column 0. `Name` becomes the Anki field name, so custom note types need no configuration.
+- **`[sync]`** — reserved and machine-owned. Visually quarantined from user content instead of masquerading as a normal key.
+- **Escaping** — a content line that would read as a marker is prefixed with `\`.
+- **Fence** — `~~~anki`. CommonMark tilde fences are closed only by tildes, so field content can contain backtick code blocks of any length. Backtick fences of 3+ are still parsed for compatibility.
 
-### Alternative: JSON Format (Optional)
+**Why this works**
 
-For simple cards or programmatic generation, JSON is also supported:
+The decisive property is **surgical write-back**. Because `[sync]` is a single line, a routine sync splices that one line and leaves every other byte alone. The plugin never re-emits user content, which makes the entire class of write-back corruption bugs *unreachable* rather than merely fixed.
 
-``````markdown
-`````anki
-{
-  "deck": "Programming",
-  "model": "Basic",
-  "fields": {
-    "Front": "What's the time complexity of binary search?",
-    "Back": "O(log n)"
-  },
-  "tags": ["algorithms", "python"],
-  "noteId": null
-}
-`````
-``````
+Secondary benefits: zero indentation, zero escaping, zero type coercion, a ~60-line parser instead of a 40KB dependency, and error messages like "Line 4: expected key: value or a [Section] marker" instead of "bad indentation of a mapping entry at line 7, column 3".
 
-**Note:** JSON requires escaping newlines with `\n`, making it less suitable for cards with code blocks or lengthy content. YAML is recommended for most use cases.
+**Why the Anki API allows it.** Anki's note model is flat — `fields` is `Record<string, string>` and that's the whole payload. The nesting that does exist in AnkiConnect v6 (`options.duplicateScopeOptions`, and `audio`/`video`/`picture` as arrays of objects) is transport concern, not card structure: `options` is sync policy that belongs in settings, and media is better derived by scanning field content for embeds than hand-authored. If structure is ever needed, a reserved box can hold a line-oriented mini-format:
 
-### YAML Best Practices
-
-**1. Always use block scalars (`|`) for field content**
-```yaml
-fields:
-  Front: |
-    Your content here
-  Back: |
-    Your answer here
+```
+[media]
+picture: diagram.png -> Back
 ```
 
-**2. Consistent indentation (2 or 4 spaces)**
-```yaml
-deck: Programming
-model: Basic
-fields:     # 0 spaces
-  Front: |  # 2 spaces
-    Text    # 4 spaces (content)
-```
+### Migration
 
-**3. Array syntax for tags**
-```yaml
-# Inline array (recommended for short lists)
-tags: [python, algorithms]
-
-# Block array (for longer lists)
-tags:
-  - python
-  - algorithms
-  - data-structures
-```
-
-**4. Cloze deletions**
-```yaml
-model: Cloze
-fields:
-  Text: |
-    The time complexity of binary search is {{c1::O(log n)}}.
-    It requires a {{c2::sorted}} array.
-```
-
-**5. Multiple paragraphs and formatting**
-```yaml
-fields:
-  Front: |
-    # Question Header
-    
-    What's the difference between:
-    - BFS
-    - DFS
-    
-    Consider both time and space complexity.
-```
+The parser detects which of the three syntaxes a block uses: a `[Section]` line means box format, a leading `{` means JSON, anything else is treated as legacy YAML. Legacy blocks keep working indefinitely and are rewritten into box format the next time they sync.
 
 ## Visual Rendering
 

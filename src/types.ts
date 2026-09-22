@@ -1,4 +1,12 @@
 /**
+ * Source syntax a block was written in.
+ *
+ * 'box' is the current format. 'yaml' and 'json' are read-only legacy formats
+ * kept so existing vaults keep working; blocks are rewritten as 'box' on sync.
+ */
+export type CardFormat = 'box' | 'yaml' | 'json';
+
+/**
  * Represents an Anki card as defined in an anki code block.
  */
 export interface AnkiCard {
@@ -11,6 +19,8 @@ export interface AnkiCard {
 	lastSyncedHash?: string;  // Hash of fields at last successful sync
 	ignore?: boolean;  // If true, skip this card during sync
 	linkSource?: boolean;  // If true, append Obsidian URI to card when syncing
+	/** Header keys we don't recognise, preserved verbatim across round-trips. */
+	extra?: Record<string, string>;
 }
 
 /**
@@ -20,6 +30,8 @@ export interface ParseResult {
 	success: boolean;
 	data?: AnkiCard;
 	error?: string;
+	/** Which syntax the block was written in. Present whenever parsing succeeded. */
+	format?: CardFormat;
 }
 
 /**
@@ -68,6 +80,10 @@ export interface AnkiBlockMatch {
 	startIndex: number;
 	endIndex: number;
 	fullMatch: string;
+	/** The opening fence exactly as written, e.g. '~~~' or '`````'. */
+	fence: string;
+	/** Leading whitespace the fence was indented by, if any. */
+	indent: string;
 }
 
 /**

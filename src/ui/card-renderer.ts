@@ -1,7 +1,6 @@
-import { MarkdownRenderer, MarkdownPostProcessorContext, MarkdownRenderChild, TFile } from 'obsidian';
+import { MarkdownRenderer, MarkdownPostProcessorContext, MarkdownRenderChild, Notice, TFile } from 'obsidian';
 import type AnkiBlocksPlugin from '../main';
-import { parseAnkiBlock } from '../services/parser';
-import { findAnkiBlocks } from '../commands/sync-command';
+import { parseCard } from '../services/card-format';
 import { AnkiCard } from '../types';
 import { computeContentHash } from '../utils/hash';
 import { DeleteConfirmModal } from './delete-confirm-modal';
@@ -11,7 +10,7 @@ import { DeleteConfirmModal } from './delete-confirm-modal';
  */
 export function registerAnkiBlockProcessor(plugin: AnkiBlocksPlugin): void {
 	plugin.registerMarkdownCodeBlockProcessor('anki', async (source, el, ctx) => {
-		const result = parseAnkiBlock(source);
+		const result = parseCard(source);
 
 		if (!result.success) {
 			renderError(el, result.error ?? 'Unknown error');
@@ -22,21 +21,7 @@ export function registerAnkiBlockProcessor(plugin: AnkiBlocksPlugin): void {
 		const renderChild = new MarkdownRenderChild(el);
 		ctx.addChild(renderChild);
 
-		// Get file and find block index for delete functionality
-		const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
-		let blockIndex = 0;
-		if (file instanceof TFile) {
-			const content = await plugin.app.vault.read(file);
-			const blocks = findAnkiBlocks(content);
-			// Find which block this is by matching the noteId or content
-			blockIndex = blocks.findIndex(b => {
-				const parsed = parseAnkiBlock(b.content);
-				return parsed.success && parsed.data?.noteId === result.data?.noteId;
-			});
-			if (blockIndex === -1) blockIndex = 0;
-		}
-
-		await renderCardPreview(el, result.data!, ctx, renderChild, plugin, blockIndex);
+		await renderCardPreview(el, result.data!, ctx, renderChild, plugin);
 	});
 }
 
@@ -113,7 +98,6 @@ async function renderCardPreview(
 	ctx: MarkdownPostProcessorContext,
 	renderChild: MarkdownRenderChild,
 	plugin: AnkiBlocksPlugin,
-	blockIndex: number
 ): Promise<void> {
 	const app = plugin.app;
 	const container = el.createDiv({ cls: 'anki-card-container' });
@@ -151,7 +135,7 @@ async function renderCardPreview(
 		const ignoredBadge = metaRow.createSpan({ cls: 'anki-card-sync-badge ignored' });
 		ignoredBadge.createSpan({ text: 'Ignored' });
 	} else if (card.noteId) {
-		const currentHash = computeContentHash(card.fields, card.deck);
+		const currentHash = computeContentHash(card);
 		const isModified = !card.lastSyncedHash || card.lastSyncedHash !== currentHash;
 		if (isModified) {
 			const syncBadge = metaRow.createSpan({ cls: 'anki-card-sync-badge modified' });
@@ -217,8 +201,19 @@ async function renderCardPreview(
 		});
 		deleteBtn.addEventListener('click', () => {
 			const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
-			if (file instanceof TFile) {
-				new DeleteConfirmModal(plugin, card.noteId!, file, blockIndex).open();
+			// getSectionInfo gives this block's exact line range, so the right
+			// block is edited even when a note holds several unsynced cards.
+			const section = ctx.getSectionInfo(el);
+			if (file instanceof TFile && section) {
+				new DeleteConfirmModal(
+					plugin,
+					card.noteId!,
+					file,
+					section.lineStart,
+					section.lineEnd,
+				).open();
+			} else {
+				new Notice('Could not locate this card in the note.');
 			}
 		});
 	}

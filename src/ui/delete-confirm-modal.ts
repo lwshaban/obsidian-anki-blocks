@@ -1,76 +1,69 @@
 import { Modal, Notice, TFile } from 'obsidian';
 import type AnkiBlocksPlugin from '../main';
 import { AnkiConnectService } from '../services/anki-connect';
-import { findAnkiBlocks } from '../commands/sync-command';
-import { parseAnkiBlock, generateCardYaml } from '../services/parser';
+import { updateSyncLine } from '../services/card-format';
 
 /**
  * Modal to confirm deletion of an Anki card.
+ *
+ * Identifies the block by its line range rather than by an index or note ID, so
+ * the right block is edited even when a note holds several unsynced cards.
  */
 export class DeleteConfirmModal extends Modal {
 	private plugin: AnkiBlocksPlugin;
 	private noteId: number;
 	private file: TFile;
-	private blockIndex: number;
+	private lineStart: number;
+	private lineEnd: number;
 
-	constructor(plugin: AnkiBlocksPlugin, noteId: number, file: TFile, blockIndex: number) {
+	constructor(plugin: AnkiBlocksPlugin, noteId: number, file: TFile, lineStart: number, lineEnd: number) {
 		super(plugin.app);
 		this.plugin = plugin;
 		this.noteId = noteId;
 		this.file = file;
-		this.blockIndex = blockIndex;
+		this.lineStart = lineStart;
+		this.lineEnd = lineEnd;
 	}
 
 	onOpen(): void {
 		const { contentEl } = this;
 
-		contentEl.createEl('h2', { text: 'Delete Anki Card' });
-
-		contentEl.createEl('p', {
-			text: 'Are you sure you want to delete this card from Anki? This will:',
-		});
+		contentEl.createEl('h2', { text: 'Delete Anki card' });
+		contentEl.createEl('p', { text: 'Delete this card from Anki? This will:' });
 
 		const list = contentEl.createEl('ul');
-		list.createEl('li', { text: 'Remove the card from Anki (cannot be undone)' });
-		list.createEl('li', { text: 'Clear the noteId and hash from the block in your file' });
+		list.createEl('li', { text: 'Remove the note from Anki (cannot be undone)' });
+		list.createEl('li', { text: 'Clear the [sync] line from the block in your note' });
 
 		const buttonContainer = contentEl.createDiv({ cls: 'anki-modal-buttons' });
 
 		const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
 		cancelBtn.addEventListener('click', () => this.close());
 
-		const deleteBtn = buttonContainer.createEl('button', {
-			text: 'Delete',
-			cls: 'mod-warning',
-		});
-		deleteBtn.addEventListener('click', () => this.handleDelete());
+		const deleteBtn = buttonContainer.createEl('button', { text: 'Delete', cls: 'mod-warning' });
+		deleteBtn.addEventListener('click', () => { void this.handleDelete(); });
 	}
 
 	private async handleDelete(): Promise<void> {
 		try {
-			// Delete from Anki
 			const ankiService = new AnkiConnectService(this.plugin.settings.ankiConnectUrl);
 			await ankiService.deleteNote(this.noteId);
 
-			// Update file to remove noteId and hash
-			let content = await this.plugin.app.vault.read(this.file);
-			const blocks = findAnkiBlocks(content);
-			const block = blocks[this.blockIndex];
+			await this.plugin.app.vault.process(this.file, (data) => {
+				const lines = data.split('\n');
+				if (this.lineEnd >= lines.length) return data;
 
-			if (block) {
-				const parseResult = parseAnkiBlock(block.content);
-				if (parseResult.success && parseResult.data) {
-					const card = parseResult.data;
-					card.noteId = null;
-					delete card.lastSyncedHash;
+				const before = lines.slice(0, this.lineStart);
+				const blockLines = lines.slice(this.lineStart, this.lineEnd + 1);
+				const after = lines.slice(this.lineEnd + 1);
 
-					const newYaml = generateCardYaml(card);
-					const newBlock = `\`\`\`\`\`anki\n${newYaml}\n\`\`\`\`\``;
-					content = content.substring(0, block.startIndex) + newBlock + content.substring(block.endIndex);
+				// Keep the fences, clear the sync state from the body.
+				const body = blockLines.slice(1, -1).join('\n');
+				const cleared = updateSyncLine(body, null, undefined);
 
-					await this.plugin.app.vault.modify(this.file, content);
-				}
-			}
+				return [...before, blockLines[0]!, ...cleared.split('\n'), blockLines[blockLines.length - 1]!, ...after]
+					.join('\n');
+			});
 
 			new Notice('Card deleted from Anki');
 			this.close();
@@ -81,7 +74,6 @@ export class DeleteConfirmModal extends Modal {
 	}
 
 	onClose(): void {
-		const { contentEl } = this;
-		contentEl.empty();
+		this.contentEl.empty();
 	}
 }

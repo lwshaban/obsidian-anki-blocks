@@ -1,8 +1,8 @@
-import { App, Modal, Setting, TFile } from 'obsidian';
+import { Modal, Setting, TFile } from 'obsidian';
 import type AnkiBlocksPlugin from '../main';
-import { generateCardYaml } from '../services/parser';
+import { serializeCard } from '../services/card-format';
 import { AnkiCard } from '../types';
-import { findAnkiBlocks } from '../commands/sync-command';
+import { wrapInFence } from '../utils/constants';
 
 /**
  * Modal for editing an existing Anki card.
@@ -10,7 +10,8 @@ import { findAnkiBlocks } from '../commands/sync-command';
 export class CardEditModal extends Modal {
 	private plugin: AnkiBlocksPlugin;
 	private file: TFile;
-	private blockIndex: number;
+	private lineStart: number;
+	private lineEnd: number;
 	private card: AnkiCard;
 	private onSave: () => void;
 
@@ -24,14 +25,16 @@ export class CardEditModal extends Modal {
 	constructor(
 		plugin: AnkiBlocksPlugin,
 		file: TFile,
-		blockIndex: number,
+		lineStart: number,
+		lineEnd: number,
 		card: AnkiCard,
 		onSave: () => void
 	) {
 		super(plugin.app);
 		this.plugin = plugin;
 		this.file = file;
-		this.blockIndex = blockIndex;
+		this.lineStart = lineStart;
+		this.lineEnd = lineEnd;
 		this.card = card;
 		this.onSave = onSave;
 
@@ -48,7 +51,7 @@ export class CardEditModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass('anki-modal');
 
-		contentEl.createEl('h2', { text: 'Edit Anki Card' });
+		contentEl.createEl('h2', { text: 'Edit Anki card' });
 
 		const form = contentEl.createDiv({ cls: 'anki-modal-content' });
 
@@ -126,7 +129,7 @@ export class CardEditModal extends Modal {
 		cancelBtn.addEventListener('click', () => this.close());
 
 		const saveBtn = buttons.createEl('button', { text: 'Save', cls: 'mod-cta' });
-		saveBtn.addEventListener('click', () => this.saveCard());
+		saveBtn.addEventListener('click', () => { void this.saveCard(); });
 	}
 
 	private async saveCard(): Promise<void> {
@@ -161,19 +164,23 @@ export class CardEditModal extends Modal {
 			updatedCard.linkSource = true;
 		}
 
-		// Generate new YAML
-		const yaml = generateCardYaml(updatedCard);
-		const newBlock = `\`\`\`\`\`anki\n${yaml}\n\`\`\`\`\``;
-
-		// Read file and find the block to replace
-		const content = await this.plugin.app.vault.read(this.file);
-		const blocks = findAnkiBlocks(content);
-
-		if (this.blockIndex >= 0 && this.blockIndex < blocks.length) {
-			const block = blocks[this.blockIndex]!;
-			const newContent = content.substring(0, block.startIndex) + newBlock + content.substring(block.endIndex);
-			await this.plugin.app.vault.modify(this.file, newContent);
+		if (this.card.extra) {
+			updatedCard.extra = this.card.extra;
 		}
+
+		const newBlock = wrapInFence(serializeCard(updatedCard));
+
+		// Replace the block by its line range so the correct one is edited even
+		// when a note holds several unsynced cards.
+		await this.plugin.app.vault.process(this.file, (data) => {
+			const lines = data.split('\n');
+			if (this.lineStart < 0 || this.lineEnd >= lines.length) return data;
+			return [
+				...lines.slice(0, this.lineStart),
+				...newBlock.split('\n'),
+				...lines.slice(this.lineEnd + 1),
+			].join('\n');
+		});
 
 		this.onSave();
 		this.close();
